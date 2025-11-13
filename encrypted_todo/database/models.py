@@ -43,7 +43,7 @@ class User:
         conn = get_connection()
         cursor = conn.cursor()
         
-        cursor.execute('SELECT user_id, username, password_hash FROM users WHERE username = ?', 
+        cursor.execute('SELECT user_id, username, password_hash, created_at FROM users WHERE username = ?', 
                       (username,))
         row = cursor.fetchone()
         conn.close()
@@ -52,7 +52,8 @@ class User:
             return {
                 'user_id': row[0],
                 'username': row[1],
-                'password_hash': row[2]
+                'password_hash': row[2],
+                'created_at': row[3]
             }
         return None
     
