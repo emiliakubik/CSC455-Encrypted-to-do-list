@@ -1,10 +1,82 @@
+import hashlib
+import hmac
+import secrets
+from typing import Optional, Tuple
+
 from database.models import User
+
+PBKDF2_ALGORITHM = "sha256"
+PBKDF2_ITERATIONS = 200_000
+PBKDF2_SALT_BYTES = 16
+HASH_PREFIX = "pbkdf2_sha256"
+
+
+def hash_password(password: str) -> str:
+    """
+    Hash a password using PBKDF2-HMAC-SHA256 with a random salt.
+    Returns a self-contained string that stores the parameters needed for verification.
+    """
+    if not isinstance(password, str):
+        raise TypeError("Password must be a string")
+    
+    if password == "":
+        raise ValueError("Password cannot be empty")
+    
+    salt = secrets.token_bytes(PBKDF2_SALT_BYTES)
+    derived_key = hashlib.pbkdf2_hmac(
+        PBKDF2_ALGORITHM,
+        password.encode("utf-8"),
+        salt,
+        PBKDF2_ITERATIONS,
+    )
+    
+    return f"{HASH_PREFIX}${PBKDF2_ITERATIONS}${salt.hex()}${derived_key.hex()}"
+
+
+def verify_password(password: str, stored_value: str) -> Tuple[bool, Optional[str]]:
+    """
+    Verify a password against the stored hash.
+    
+    Returns:
+        (is_valid, upgraded_hash)
+        upgraded_hash will be populated when the stored value was plaintext and
+        needs to be upgraded to the secure hash format.
+    """
+    if not isinstance(password, str):
+        return False, None
+    
+    if not stored_value:
+        return False, None
+    
+    if stored_value.startswith(f"{HASH_PREFIX}$"):
+        try:
+            _, iteration_str, salt_hex, hash_hex = stored_value.split("$", 3)
+            iterations = int(iteration_str)
+            salt = bytes.fromhex(salt_hex)
+            stored_hash = bytes.fromhex(hash_hex)
+        except (ValueError, TypeError):
+            return False, None
+        
+        candidate_hash = hashlib.pbkdf2_hmac(
+            PBKDF2_ALGORITHM,
+            password.encode("utf-8"),
+            salt,
+            iterations,
+        )
+        return hmac.compare_digest(candidate_hash, stored_hash), None
+    
+    # Legacy plaintext storage fallback
+    if stored_value == password:
+        upgraded_hash = hash_password(password)
+        return True, upgraded_hash
+    
+    return False, None
+
 
 def register_user(username, password):
     """
     Register a new user. 
     Returns (success, message, user_id).
-    Note: Password hashing will be handled by another team member.
     """
     # Basic input validation
     if not username or username.strip() == "":
@@ -19,11 +91,11 @@ def register_user(username, password):
     if not password or len(password) < 6:
         return False, "Password must be at least 6 characters", None
     
-    # For now, store password as plain text (hashing will be added by crypto team)
     username = username.strip().lower()  # Normalize username
+    password_hash = hash_password(password)
     
     # Attempt to create user
-    user_id = User.create(username, password)
+    user_id = User.create(username, password_hash)
     
     if user_id:
         return True, "User registered successfully", user_id
@@ -35,7 +107,6 @@ def login_user(username, password):
     """
     Authenticate user login.
     Returns (success, message, user_data).
-    Note: Password verification will be enhanced by crypto team.
     """
     if not username or not password:
         return False, "Username and password required", None
@@ -49,16 +120,20 @@ def login_user(username, password):
     if not user_data:
         return False, "Invalid username", None
     
-    # For now, simple password comparison (will be replaced with hash verification)
-    if user_data['password_hash'] == password:
+    # Validate hashed password (with legacy plaintext fallback)
+    password_valid, upgraded_hash = verify_password(password, user_data['password_hash'])
+    if password_valid:
+        if upgraded_hash:
+            User.update(user_data['user_id'], password_hash=upgraded_hash)
+        
         # Remove password from returned data for security
         safe_user_data = {
             'user_id': user_data['user_id'],
             'username': user_data['username']
         }
         return True, "Login successful", safe_user_data
-    else:
-        return False, "Invalid password", None
+    
+    return False, "Invalid password", None
 
 
 def logout_user():
