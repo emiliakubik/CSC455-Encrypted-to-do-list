@@ -55,6 +55,27 @@ class User:
                 'password_hash': row[2]
             }
         return None
+
+    @staticmethod
+    def get_by_id(user_id):
+        """Get user data by id. Returns user dict or None if not found."""
+        from database.db_setup import get_connection
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT user_id, username, password_hash FROM users WHERE user_id = ?',
+                      (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {
+                'user_id': row[0],
+                'username': row[1],
+                'password_hash': row[2]
+            }
+        return None
     
     @staticmethod
     def update(user_id, username=None, password_hash=None):
