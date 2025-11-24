@@ -15,17 +15,18 @@ class TaskWindow(QtWidgets.QMainWindow):
     def __init__(self, user_data, parent=None):
         super().__init__(parent)
         self.user = user_data
-        self.setWindowTitle(f"Encrypted To-Do — {self.user['username']}")
+        self.setWindowTitle(f"PlanIt — {self.user['username']}")
         self.resize(800, 480)
 
         self._tasks = []
         # keep animations alive so they don’t get GC’d
         self._active_anims: list[QtCore.QAbstractAnimation] = []
-        
-        self.current_filter = "all"  # "all", "done", "pending"
+
+        self.current_filter = "all"  # "all", "done", "pending", "shared"
 
         # ---------- MAIN LAYOUT ----------
         central = QtWidgets.QWidget()
+        central.setObjectName("centralWidget")
         self.setCentralWidget(central)
 
         main_layout = QtWidgets.QHBoxLayout()
@@ -39,39 +40,53 @@ class TaskWindow(QtWidgets.QMainWindow):
         left_layout.setContentsMargins(0, 0, 20, 0)
         left_layout.setSpacing(10)
 
-        # task list widget
-        self.list_widget = QtWidgets.QListWidget()
-        self.list_widget.setObjectName("todoList")
-
         # tiny filter bar above the list
         filter_row = QtWidgets.QHBoxLayout()
         self.filter_all_btn = QtWidgets.QPushButton("🌟 All")
         self.filter_done_btn = QtWidgets.QPushButton("✔ Done")
         self.filter_pending_btn = QtWidgets.QPushButton("✏ Pending")
+        self.filter_shared_btn = QtWidgets.QPushButton("🤝 Shared")
 
-        for b in (self.filter_all_btn, self.filter_done_btn, self.filter_pending_btn):
+        for b in (
+            self.filter_all_btn,
+            self.filter_done_btn,
+            self.filter_pending_btn,
+            self.filter_shared_btn,
+        ):
             b.setCheckable(True)
             filter_row.addWidget(b)
-
         filter_row.addStretch()
 
         # default filter
         self.filter_all_btn.setChecked(True)
 
         left_layout.addLayout(filter_row)
+
+        # task list widget
+        self.list_widget = QtWidgets.QListWidget()
+        self.list_widget.setObjectName("todoList")
         left_layout.addWidget(self.list_widget, 1)
 
         # add left column to main layout (narrower)
         main_layout.addLayout(left_layout, 1)
 
         # ========== RIGHT COLUMN: HEADER + DETAILS + BUTTONS ==========
-        right_layout = QtWidgets.QVBoxLayout()
+        right_container = QtWidgets.QWidget()
+        right_container.setObjectName("rightColumn")
+        right_layout = QtWidgets.QVBoxLayout(right_container)
         # 🌸 padding inside the right column (welcome, chips, details, buttons)
         right_layout.setContentsMargins(18, 12, 18, 18)
-        right_layout.setSpacing(16)
+        right_layout.setSpacing(24)   # more space between header / chips / progress
 
-        # ----------- HEADER: MASCOT + WELCOME TEXT + DATE -----------
-        header_row = QtWidgets.QHBoxLayout()
+        main_layout.addWidget(right_container, 3)
+
+        # ----------- LONG TOP HEADER BAR (logo + welcome + date) -----------
+        header_container = QtWidgets.QWidget()
+        header_container.setObjectName("topHeaderBar")
+
+        header_row = QtWidgets.QHBoxLayout(header_container)
+        header_row.setContentsMargins(18, 10, 18, 10)
+        header_row.setSpacing(12)
 
         # cute mascot icon
         self.mascot_label = QtWidgets.QLabel()
@@ -80,7 +95,7 @@ class TaskWindow(QtWidgets.QMainWindow):
         pix = QtGui.QPixmap("icons/planit_logo.png")  # adjust path if needed
         if not pix.isNull():
             pix = pix.scaled(
-                48, 48,
+                150, 150,                    # big logo like you had
                 QtCore.Qt.KeepAspectRatio,
                 QtCore.Qt.SmoothTransformation,
             )
@@ -92,18 +107,18 @@ class TaskWindow(QtWidgets.QMainWindow):
         )
         self.welcome_label.setObjectName("welcomeHeader")
 
-        header_row.addWidget(self.mascot_label)
-        header_row.addWidget(self.welcome_label)
-        header_row.addStretch()
-
-        # today's date badge on the right side of the same row
+        # today's date badge on the right side of the same bar
         self.date_label = QtWidgets.QLabel()
         self.date_label.setObjectName("dateBadge")
         self._update_date_label()      # fill in text like "📅 Today • Friday, Nov 22"
+
+        header_row.addWidget(self.mascot_label)
+        header_row.addWidget(self.welcome_label)
+        header_row.addStretch()
         header_row.addWidget(self.date_label)
 
-        # add header row to layout
-        right_layout.addLayout(header_row)
+        # add full-width header bar to right column
+        right_layout.addWidget(header_container)
 
         # ---------- TASK SUMMARY CHIPS (Total / Done / Pending) ----------
         chips_row = QtWidgets.QHBoxLayout()
@@ -119,8 +134,11 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         chips_row.addStretch()
         right_layout.addLayout(chips_row)
-        
-                # ---------- TODAY'S PROGRESS BAR + VIBE TEXT ----------
+
+        # a little gap before the progress bar
+        right_layout.addSpacing(10)
+
+        # ---------- TODAY'S PROGRESS BAR + VIBE TEXT ----------
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setFixedHeight(10)
@@ -173,9 +191,6 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         right_layout.addWidget(footer_bar)
 
-        # add right column to main layout
-        main_layout.addLayout(right_layout, 3)
-
         # button squish animation (visible bounce + opacity blink)
         for b in (new_btn, edit_btn, share_btn, refresh_btn, logout_btn):
             eff = QtWidgets.QGraphicsOpacityEffect(b)
@@ -198,6 +213,7 @@ class TaskWindow(QtWidgets.QMainWindow):
         self.filter_all_btn.clicked.connect(lambda: self._set_filter("all"))
         self.filter_done_btn.clicked.connect(lambda: self._set_filter("done"))
         self.filter_pending_btn.clicked.connect(lambda: self._set_filter("pending"))
+        self.filter_shared_btn.clicked.connect(lambda: self._set_filter("shared"))
 
         self.refresh()
         # start the soft idle animation on the mascot
@@ -216,7 +232,7 @@ class TaskWindow(QtWidgets.QMainWindow):
                 pass
 
         anim.finished.connect(_cleanup)
-        
+
     def _set_filter(self, mode: str):
         """Change current filter and update buttons + list."""
         self.current_filter = mode
@@ -226,6 +242,7 @@ class TaskWindow(QtWidgets.QMainWindow):
             self.filter_all_btn.setChecked(mode == "all")
             self.filter_done_btn.setChecked(mode == "done")
             self.filter_pending_btn.setChecked(mode == "pending")
+            self.filter_shared_btn.setChecked(mode == "shared")
 
         # rebuild list with new filter
         self.refresh()
@@ -352,7 +369,7 @@ class TaskWindow(QtWidgets.QMainWindow):
             pass
 
     # ================= CORE BEHAVIOR =================
-    
+
     def refresh(self):
         """Reload tasks and rebuild the list with native checkable items."""
         self.list_widget.blockSignals(True)
@@ -367,13 +384,21 @@ class TaskWindow(QtWidgets.QMainWindow):
                 return t["is_complete"]
             if self.current_filter == "pending":
                 return not t["is_complete"]
+            if self.current_filter == "shared":
+                # treat tasks CREATED BY someone else as "shared with me"
+                return t["created_by"] != self.user["user_id"]
             return True  # "all"
 
         for t in tasks:
             if not _visible(t):
                 continue
 
-            item = QtWidgets.QListWidgetItem(t["title"])
+            # build title (add shared badge if not created by me)
+            title = t["title"]
+            if t["created_by"] != self.user["user_id"]:
+                title += "   🤝"
+
+            item = QtWidgets.QListWidgetItem(title)
             item.setData(QtCore.Qt.UserRole, t["task_id"])
 
             flags = (
@@ -452,13 +477,40 @@ class TaskWindow(QtWidgets.QMainWindow):
         except Exception:
             updater_label = str(t["updated_by"])
 
+        # Base meta text
         meta = (
             f"Created by: {creator_label} | "
             f"Updated by: {updater_label} | "
             f"Complete: {t['is_complete']}"
         )
 
-        self.details.setPlainText(meta + "\n\n" + t["details"])
+        # --- Shared info ---
+        shared_extra = ""
+        try:
+            # uses same helper as ShareDialog
+            shares = task_manager.get_task_shares(t["task_id"])  # list of {user_id, username}
+        except Exception:
+            shares = []
+
+        # If *you* are not the creator, show who shared it with you
+        if t.get("created_by") is not None and t["created_by"] != self.user["user_id"]:
+            shared_extra = f" | Shared by: {creator_label}"
+        else:
+            # You are the creator – show who you shared it with (if anyone)
+            if shares:
+                # exclude yourself from the list if present
+                other_names = [
+                    s.get("username", str(s.get("user_id")))
+                    for s in shares
+                    if s.get("user_id") != self.user["user_id"]
+                ]
+                if other_names:
+                    shared_extra = " | Shared with: " + ", ".join(other_names)
+
+        meta += shared_extra
+
+        # Write meta + full details into the right panel
+        self.details.setPlainText(meta + "\n\n" + t.get("details", ""))
 
     def _on_item_changed(self, item: QtWidgets.QListWidgetItem):
         """Called when the user ticks/unticks the checkbox in the list."""
@@ -485,7 +537,7 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         if checked:
             self._play_complete_effect(item)
-            
+
         # --- UPDATE PROGRESS BAR + VIBE IMMEDIATELY ---
         total = len(self._tasks)
         completed = sum(1 for t in self._tasks if t["is_complete"])
@@ -519,26 +571,35 @@ class TaskWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Share", "Select a task first")
             return
 
-        t = self._tasks[row]
-        task_id = t["task_id"]
+        item = self.list_widget.currentItem()
+        task_id = item.data(QtCore.Qt.UserRole)
+
         dlg = ShareDialog(task_id, self.user["user_id"], self)
         dlg.exec_()
 
     def _on_edit(self):
         row = self.list_widget.currentRow()
-        if row < 0 or row >= len(self._tasks):
+        if row < 0:
             QtWidgets.QMessageBox.warning(self, "Edit Task", "Select a task first")
             return
 
-        task = self._tasks[row]
+        item = self.list_widget.currentItem()
+        task_id = item.data(QtCore.Qt.UserRole)
+
+        task = None
+        for t in self._tasks:
+            if t["task_id"] == task_id:
+                task = t
+                break
+
+        if task is None:
+            QtWidgets.QMessageBox.warning(self, "Edit Task", "Task not found.")
+            return
+
         dlg = EditTaskDialog(task, self.user["user_id"], self)
         if dlg.exec_():
             # reload tasks so list + details show updated text
             self.refresh()
-            # restore selection to the same row if still valid
-            if row < self.list_widget.count():
-                self.list_widget.setCurrentRow(row)
-                self._on_select()
 
     def _on_logout(self):
         self.logout_requested.emit()
