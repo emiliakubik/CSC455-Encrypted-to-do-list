@@ -8,7 +8,7 @@ def get_stylesheet():
 /* GLOBAL LOGIN-STYLE FONT APPLIED TO ENTIRE APP */
 QWidget, QMainWindow, QDialog, QLabel, QPushButton, QLineEdit, QTextEdit, QListWidget, QListWidget::item {
   font-family: "Segoe UI Semilight", "Segoe UI", "Helvetica Neue", Arial;
-  font-size: 18px;                  /* softer, rounder, login vibe */
+  font-size: 24px;                  /* was 18px – make whole app bigger */
   color: #4b3670;                   /* same purple-gray as login */
   letter-spacing: 0.3px;            /* subtle cute spacing */
 }
@@ -120,7 +120,7 @@ QCheckBox::indicator, QListView::indicator, QListWidget::indicator, QTreeView::i
 
 /* Title area style */
 QLabel.title {
-  font-size: 16px;
+  font-size: 26px;   /* was 16px */
   font-weight: 600;
   color: #45335a;
 }
@@ -128,11 +128,11 @@ QLabel.title {
 /* Small subtle footer text */
 QLabel.subtle {
   color: rgba(58,43,74,0.6);
-  font-size: 11px;
+  font-size: 16px;   /* was 11px */
 }
 
 QLabel#panelTitle {
-  font-size: 18px;
+  font-size: 26px;   /* was 18px */
   font-weight: 600;
   color: #f5f0ff;
   margin-bottom: 6px;
@@ -153,7 +153,7 @@ QListWidget#todoList QCheckBox::indicator:checked {
 }
 
 /* ================================
-   Login Dialog – PlanIt Style
+   Login Dialog
    ================================*/
 
 QDialog#loginDialog {
@@ -172,14 +172,14 @@ QLabel#loginLogo {
 
 /* Main title: "Log in to PlanIt" */
 QLabel#loginTitle {
-  font-size: 22px;
+  font-size: 30px;      /* was 22px */
   font-weight: 600;
   color: #ffffff;                 /* bright against darker bg */
 }
 
 /* Small helper text */
 QLabel#loginSubtitle {
-  font-size: 11px;
+  font-size: 16px;      /* was 11px */
   color: rgba(230, 225, 255, 0.85);
 }
 
@@ -219,60 +219,114 @@ QPushButton#loginSecondaryBtn {
     stop:0 #fdfbff,
     stop:1 #f6edff);
   border-radius: 14px;
-  border: 1px solid rgba(180, 150, 255, 0.7);
+  border: 1px solid #b9ff5a;
   padding: 8px 16px;
   color: #4b2f78;
 }
 
 QPushButton#loginSecondaryBtn:hover {
-  background: #eaffd6;          /* soft PlanIt green */
-  border-color: #a6ff77;        /* brighter green outline */
+  background: #f4ffe6;          /* soft pastel green glow */
+  border-color: #b9ff5a;        /* same PlanIt green accent */
   color: #4b2f78;               /* keep the same purple text */
 }
 
-/* Dashboard welcome header */
-QLabel#welcomeHeader {
-    font-size: 22px;
-    font-weight: 600;
-    color: #ffffff;                          /* bright so it pops */
-    padding: 4px 12px;
-    background: rgba(255, 255, 255, 0.60);   /* soft frosted pill */
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
+/* ================================
+   ✨ PlanIt Dialog Theme
+   (Used for New Task, Edit Task, Share)
+   ================================*/
+
+QDialog {
+    background: qlineargradient(
+        spread:pad, x1:0, y1:0, x2:1, y2:1,
+        stop:0 #f4e9ff,
+        stop:0.5 #ebddff,
+        stop:1 #d4c2ff
+    );
+    border-radius: 18px;
+    border: 1px solid rgba(185, 255, 90, 0.45);   /* PlanIt green outline */
+    padding: 12px;
 }
+
+/* Inputs */
+QDialog QLineEdit,
+QDialog QTextEdit {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(150,115,255,0.55);
+    font-size: 24px;              /* was 16px – bigger dialog text */
+}
+
+QDialog QLineEdit:focus,
+QDialog QTextEdit:focus {
+    border: 1px solid #b9ff5a;                   /* PlanIt green glow */
+    background: #ffffff;
+}
+
+/* Buttons */
+QDialog QPushButton {
+    background: qlineargradient(
+        spread:pad, x1:0, y1:0, x2:0, y2:1,
+        stop:0 #ffffff,
+        stop:1 #f3e7ff
+    );
+    border-radius: 14px;
+    border: 1px solid #b9ff5a;                   /* green accent */
+    padding: 8px 16px;
+    font-weight: 500;
+    color: #4b2f78;
+}
+
+QDialog QPushButton:hover {
+    background: #f4ffe6;                         /* soft green glow */
+}
+
+/* Make dialog look less cramped */
+QDialog QWidget {
+    margin-top: 6px;
+}
+
+/* ================================
+   Dashboard Header + Chips + Date
+   ================================*/
 
 /* Dashboard header: mascot + welcome text */
 QLabel#mascotLabel {
   margin-right: 8px;
 }
 
+/* BIG welcome banner */
 QLabel#welcomeHeader {
-  font-size: 20px;
-  font-weight: 600;
-  color: #5a3e85;
+    font-size: 28px;                          /* starter size; overridden later to 42px */
+    font-weight: 700;
+    color: #5a3e85;
+    padding: 10px 18px;                       /* thicker pill */
+    background: rgba(255, 255, 255, 0.60);   /* soft frosted pill */
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-/* Cute task summary chips under welcome header */
+/* Cute task summary chips under welcome header – bigger */
 QLabel[chip="true"] {
   background: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1,
     stop:0 #ffffff,
     stop:1 #f5ecff);
   border-radius: 999px;             /* pill shape */
   border: 1px solid rgba(185, 255, 90, 0.6);  /* PlanIt green accent */
-  padding: 4px 10px;
+  padding: 8px 16px;                /* bigger */
   margin-right: 8px;
-  font-size: 13px;
+  font-size: 22px;                  /* was 16px */
   color: #4b2f78;
 }
 
-/* Soft pastel date badge */
+/* Soft pastel date badge – bigger */
 QLabel#dateBadge {
-    font-size: 13px;
+    font-size: 24px;                /* was 18px */
     font-weight: 500;
     color: #5a3e85;                     /* soft purple */
-    padding: 4px 10px;
+    padding: 8px 16px;
     background: rgba(185, 255, 90, 0.50);   /* PlanIt green glow */
-    border-radius: 10px;
+    border-radius: 16px;
     border: 1px solid rgba(185, 255, 90, 0.75);
     margin-left: 8px;
 }
@@ -293,7 +347,7 @@ QTextEdit {
     margin: 12px;
 }
 
-/* The whole right details column gets breathing space */
+/* The whole right details column gets breathing space (used if you set objectName) */
 QWidget#rightColumn {
     padding: 10px;
 }
@@ -308,14 +362,16 @@ QWidget#footerBar {
 /* Bigger progress bar */
 QProgressBar {
     background: rgba(255, 255, 255, 0.25);
-    border-radius: 10px;
+    border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.35);
-    height: 20px;                 /* <-- bigger */
-    min-height: 20px;
+    height: 28px;                 /* bigger */
+    min-height: 28px;
+    margin-top: 10px;
+    margin-bottom: 14px;
 }
 
 QProgressBar::chunk {
-    border-radius: 10px;
+    border-radius: 14px;
     background: qlineargradient(
         spread:pad, x1:0, y1:0, x2:1, y2:0,
         stop:0 #c7ff89,
@@ -325,11 +381,75 @@ QProgressBar::chunk {
 
 /* Larger vibe text */
 QLabel#vibeLabel {
-    font-size: 15px;               /* <-- bigger */
+    font-size: 22px;               /* was 15px */
     font-weight: 500;
     color: rgba(255, 255, 255, 0.95);
     margin-top: 8px;
     margin-bottom: 12px;
 }
 
+/* Long header bar that wraps mascot + welcome + date */
+QWidget#topHeaderBar {
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    margin-bottom: 6px;           /* tiny gap under the bar */
+}
+
+/* === Flatten welcome label so it doesn't look like a second box === */
+QLabel#welcomeHeader {
+    font-size: 42px;          /* keep it big */
+    font-weight: 600;
+    color: #5a3e85;           /* soft purple */
+    padding: 0px 4px;         /* tiny padding or 0 if you want */
+    background: transparent;  /* remove inner pill */
+    border: none;             /* remove inner border */
+}
+
+/* === Flatten the date badge too so it doesn't create a second box === */
+QLabel#dateBadge {
+    background: transparent;
+    border: none;
+    padding: 0px;
+    font-size: 42px;     /* keep text size nice */
+    color: #ffffff;      /* white so it pops on header */
+}
+
+/* ================================
+   Bigger To-Do List Item Text
+   ================================*/
+QListWidget#todoList::item {
+    font-size: 35px;        /* your big list text */
+    padding: 12px;          /* more breathing room */
+}
+
+/* When selected */
+QListWidget#todoList::item:selected {
+    font-size: 35px;
+}
+
+/* Checkbox size inside list */
+QListWidget#todoList QCheckBox {
+    font-size: 35px;
+}
+
+/* ================================
+   Bigger Details Panel Text
+   ================================*/
+QTextEdit {
+    font-size: 30px;         /* bigger description + metadata text */
+    line-height: 1.35;       /* nicer reading spacing */
+}
+
+/* Bigger task list text */
+QListWidget#todoList {
+    font-size: 35px;       /* bigger list text */
+    font-family: "Segoe UI Semilight";
+}
+
+/* Bigger text specifically inside list items */
+QListWidget#todoList::item {
+    font-size: 35px;       /* match detail size */
+    padding: 10px;
+}
 '''

@@ -33,7 +33,7 @@ def main():
 
         win = TaskWindow(user)
         win.logout_requested.connect(on_logout)
-        win.show()
+        win.showMaximized()
         windows['task'] = win
 
     def on_logout():
