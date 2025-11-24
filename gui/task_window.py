@@ -3,6 +3,7 @@ from core import task_manager
 from database.models import User
 from gui.share_window import ShareDialog
 import qtawesome as qta
+from datetime import datetime
 
 QPropertyAnimation = QtCore.QPropertyAnimation
 QParallelAnimationGroup = QtCore.QParallelAnimationGroup
@@ -20,20 +21,115 @@ class TaskWindow(QtWidgets.QMainWindow):
         self._tasks = []
         # keep animations alive so they don’t get GC’d
         self._active_anims: list[QtCore.QAbstractAnimation] = []
+        
+        self.current_filter = "all"  # "all", "done", "pending"
 
         # ---------- MAIN LAYOUT ----------
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
+
         main_layout = QtWidgets.QHBoxLayout()
+        # 🌸 extra breathing room around everything
+        main_layout.setContentsMargins(40, 30, 40, 30)
+        main_layout.setSpacing(32)
         central.setLayout(main_layout)
 
-        # LEFT: task list
+        # ========== LEFT COLUMN: FILTERS + TASK LIST ==========
+        left_layout = QtWidgets.QVBoxLayout()
+        left_layout.setContentsMargins(0, 0, 20, 0)
+        left_layout.setSpacing(10)
+
+        # task list widget
         self.list_widget = QtWidgets.QListWidget()
         self.list_widget.setObjectName("todoList")
-        main_layout.addWidget(self.list_widget, 1)
 
-        # RIGHT: details + footer buttons (vertical)
+        # tiny filter bar above the list
+        filter_row = QtWidgets.QHBoxLayout()
+        self.filter_all_btn = QtWidgets.QPushButton("🌟 All")
+        self.filter_done_btn = QtWidgets.QPushButton("✔ Done")
+        self.filter_pending_btn = QtWidgets.QPushButton("✏ Pending")
+
+        for b in (self.filter_all_btn, self.filter_done_btn, self.filter_pending_btn):
+            b.setCheckable(True)
+            filter_row.addWidget(b)
+
+        filter_row.addStretch()
+
+        # default filter
+        self.filter_all_btn.setChecked(True)
+
+        left_layout.addLayout(filter_row)
+        left_layout.addWidget(self.list_widget, 1)
+
+        # add left column to main layout (narrower)
+        main_layout.addLayout(left_layout, 1)
+
+        # ========== RIGHT COLUMN: HEADER + DETAILS + BUTTONS ==========
         right_layout = QtWidgets.QVBoxLayout()
+        # 🌸 padding inside the right column (welcome, chips, details, buttons)
+        right_layout.setContentsMargins(18, 12, 18, 18)
+        right_layout.setSpacing(16)
+
+        # ----------- HEADER: MASCOT + WELCOME TEXT + DATE -----------
+        header_row = QtWidgets.QHBoxLayout()
+
+        # cute mascot icon
+        self.mascot_label = QtWidgets.QLabel()
+        self.mascot_label.setObjectName("mascotLabel")
+
+        pix = QtGui.QPixmap("icons/planit_logo.png")  # adjust path if needed
+        if not pix.isNull():
+            pix = pix.scaled(
+                48, 48,
+                QtCore.Qt.KeepAspectRatio,
+                QtCore.Qt.SmoothTransformation,
+            )
+            self.mascot_label.setPixmap(pix)
+
+        # welcome text
+        self.welcome_label = QtWidgets.QLabel(
+            f"Welcome back, {self.user['username'].capitalize()} 💜"
+        )
+        self.welcome_label.setObjectName("welcomeHeader")
+
+        header_row.addWidget(self.mascot_label)
+        header_row.addWidget(self.welcome_label)
+        header_row.addStretch()
+
+        # today's date badge on the right side of the same row
+        self.date_label = QtWidgets.QLabel()
+        self.date_label.setObjectName("dateBadge")
+        self._update_date_label()      # fill in text like "📅 Today • Friday, Nov 22"
+        header_row.addWidget(self.date_label)
+
+        # add header row to layout
+        right_layout.addLayout(header_row)
+
+        # ---------- TASK SUMMARY CHIPS (Total / Done / Pending) ----------
+        chips_row = QtWidgets.QHBoxLayout()
+
+        self.total_chip = QtWidgets.QLabel()
+        self.completed_chip = QtWidgets.QLabel()
+        self.pending_chip = QtWidgets.QLabel()
+
+        # mark them as "chip" so stylesheet can style them nicely
+        for chip in (self.total_chip, self.completed_chip, self.pending_chip):
+            chip.setProperty("chip", True)
+            chips_row.addWidget(chip)
+
+        chips_row.addStretch()
+        right_layout.addLayout(chips_row)
+        
+                # ---------- TODAY'S PROGRESS BAR + VIBE TEXT ----------
+        self.progress_bar = QtWidgets.QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(10)
+        self.progress_bar.setRange(0, 100)
+        right_layout.addWidget(self.progress_bar)
+
+        self.vibe_label = QtWidgets.QLabel()
+        self.vibe_label.setObjectName("vibeLabel")
+        right_layout.addWidget(self.vibe_label)
 
         # details area – full height, just text
         self.details = QtWidgets.QTextEdit()
@@ -44,8 +140,14 @@ class TaskWindow(QtWidgets.QMainWindow):
         )
         right_layout.addWidget(self.details, 1)
 
-        # footer buttons
-        btn_row = QtWidgets.QHBoxLayout()
+        # footer buttons inside a glowing footer bar
+        footer_bar = QtWidgets.QWidget()
+        footer_bar.setObjectName("footerBar")
+
+        btn_row = QtWidgets.QHBoxLayout(footer_bar)
+        btn_row.setContentsMargins(12, 8, 12, 8)
+        btn_row.setSpacing(12)
+
         new_btn = QtWidgets.QPushButton("New")
         edit_btn = QtWidgets.QPushButton("Edit")
         share_btn = QtWidgets.QPushButton("Share")
@@ -68,10 +170,11 @@ class TaskWindow(QtWidgets.QMainWindow):
         btn_row.addWidget(share_btn)
         btn_row.addWidget(refresh_btn)
         btn_row.addWidget(logout_btn)
-        right_layout.addLayout(btn_row)
+
+        right_layout.addWidget(footer_bar)
 
         # add right column to main layout
-        main_layout.addLayout(right_layout, 2)
+        main_layout.addLayout(right_layout, 3)
 
         # button squish animation (visible bounce + opacity blink)
         for b in (new_btn, edit_btn, share_btn, refresh_btn, logout_btn):
@@ -91,7 +194,14 @@ class TaskWindow(QtWidgets.QMainWindow):
         share_btn.clicked.connect(self._on_share)
         logout_btn.clicked.connect(self._on_logout)
 
+        # filter buttons
+        self.filter_all_btn.clicked.connect(lambda: self._set_filter("all"))
+        self.filter_done_btn.clicked.connect(lambda: self._set_filter("done"))
+        self.filter_pending_btn.clicked.connect(lambda: self._set_filter("pending"))
+
         self.refresh()
+        # start the soft idle animation on the mascot
+        self._start_mascot_idle_animation()
 
     # ================= ANIMATION HELPERS =================
 
@@ -106,6 +216,44 @@ class TaskWindow(QtWidgets.QMainWindow):
                 pass
 
         anim.finished.connect(_cleanup)
+        
+    def _set_filter(self, mode: str):
+        """Change current filter and update buttons + list."""
+        self.current_filter = mode
+
+        # keep toggle state in sync
+        if hasattr(self, "filter_all_btn"):
+            self.filter_all_btn.setChecked(mode == "all")
+            self.filter_done_btn.setChecked(mode == "done")
+            self.filter_pending_btn.setChecked(mode == "pending")
+
+        # rebuild list with new filter
+        self.refresh()
+
+    def _update_date_label(self):
+        """Set the cute 'Today • Friday, Nov 22' text."""
+        today = QtCore.QDate.currentDate()
+        pretty = today.toString("dddd, MMM d")   # e.g. Friday, Nov 22
+        self.date_label.setText(f"📅 Today • {pretty}")
+
+    def _start_mascot_idle_animation(self):
+        if not hasattr(self, "mascot_label") or self.mascot_label is None:
+            return
+
+        effect = QtWidgets.QGraphicsOpacityEffect(self.mascot_label)
+        self.mascot_label.setGraphicsEffect(effect)
+        effect.setOpacity(0.8)
+
+        anim = QPropertyAnimation(effect, b"opacity")
+        anim.setDuration(1800)
+        anim.setStartValue(0.75)
+        anim.setKeyValueAt(0.5, 1.0)
+        anim.setEndValue(0.75)
+        anim.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
+        anim.setLoopCount(-1)  # infinite loop
+
+        self._register_anim(anim)
+        anim.start()
 
     def _animate_button_press(
         self,
@@ -204,7 +352,7 @@ class TaskWindow(QtWidgets.QMainWindow):
             pass
 
     # ================= CORE BEHAVIOR =================
-
+    
     def refresh(self):
         """Reload tasks and rebuild the list with native checkable items."""
         self.list_widget.blockSignals(True)
@@ -213,7 +361,18 @@ class TaskWindow(QtWidgets.QMainWindow):
         tasks = task_manager.get_tasks_for_user(self.user["user_id"])
         self._tasks = tasks
 
+        # helper to decide if a task should be visible under current filter
+        def _visible(t):
+            if self.current_filter == "done":
+                return t["is_complete"]
+            if self.current_filter == "pending":
+                return not t["is_complete"]
+            return True  # "all"
+
         for t in tasks:
+            if not _visible(t):
+                continue
+
             item = QtWidgets.QListWidgetItem(t["title"])
             item.setData(QtCore.Qt.UserRole, t["task_id"])
 
@@ -231,11 +390,46 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         self.list_widget.blockSignals(False)
 
-        if tasks:
+        # --- UPDATE SUMMARY CHIPS (always based on ALL tasks) ---
+        total = len(tasks)
+        completed = sum(1 for t in tasks if t["is_complete"])
+        pending = total - completed
+
+        if hasattr(self, "total_chip"):
+            self.total_chip.setText(f"🌟 Total: {total}")
+        if hasattr(self, "completed_chip"):
+            self.completed_chip.setText(f"✔ Done: {completed}")
+        if hasattr(self, "pending_chip"):
+            self.pending_chip.setText(f"✏ Pending: {pending}")
+
+        # update progress bar + vibe
+        pct = int((completed / total) * 100) if total > 0 else 0
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.setValue(pct)
+
+        if hasattr(self, "vibe_label"):
+            if total == 0:
+                vibe = "No tasks yet — start a mission ✨"
+            elif pct == 0:
+                vibe = "Let’s start with one task 🌱"
+            elif pct < 50:
+                vibe = "Nice, you’re getting into orbit 🚀"
+            elif pct < 100:
+                vibe = "So close, keep going ⭐"
+            else:
+                vibe = "All done — mission complete 🌙"
+            self.vibe_label.setText(vibe)
+
+        # keep date fresh (in case app stays open over midnight)
+        self._update_date_label()
+
+        if self.list_widget.count() > 0:
             self.list_widget.setCurrentRow(0)
             self._on_select()
         else:
-            self.details.clear()
+            self.details.setPlainText(
+                "No tasks yet!\n\nStart your first mission by clicking “New” 🌙"
+            )
 
     def _on_select(self):
         sel = self.list_widget.currentRow()
@@ -291,6 +485,28 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         if checked:
             self._play_complete_effect(item)
+            
+        # --- UPDATE PROGRESS BAR + VIBE IMMEDIATELY ---
+        total = len(self._tasks)
+        completed = sum(1 for t in self._tasks if t["is_complete"])
+
+        if hasattr(self, "progress_bar"):
+            pct = int((completed / total) * 100) if total > 0 else 0
+            self.progress_bar.setValue(pct)
+
+        if hasattr(self, "vibe_label"):
+            if total == 0:
+                vibe = "No tasks yet — start a mission ✨"
+            elif pct == 0:
+                vibe = "Let’s start with one task 🌱"
+            elif pct < 50:
+                vibe = "Nice, you’re getting into orbit 🚀"
+            elif pct < 100:
+                vibe = "So close, keep going ⭐"
+            else:
+                vibe = "All done — mission complete 🌙"
+
+            self.vibe_label.setText(vibe)
 
     def _on_new(self):
         dialog = NewTaskDialog(self.user["user_id"], self)

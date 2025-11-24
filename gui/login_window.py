@@ -1,4 +1,4 @@
-from gui.qt_compat import QtWidgets, QtCore
+from gui.qt_compat import QtWidgets, QtCore, QtGui
 from core import user_auth
 import qtawesome as qta
 
@@ -9,28 +9,48 @@ class LoginWindow(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # give unique name so stylesheet can target it
+        # Object name so the stylesheet can target this dialog
         self.setObjectName("loginDialog")
 
-        # remove Windows "?" button
+        # Remove the Windows "?" help button
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         self.setWindowTitle("PlanIt — Login")
-        self.resize(380, 260)
+        self.resize(420, 320)
 
         # ----------- MAIN LAYOUT -----------
         main = QtWidgets.QVBoxLayout(self)
         main.setContentsMargins(24, 24, 24, 20)
-        main.setSpacing(16)
+        main.setSpacing(14)
 
-        # 🌸 cute title
-        title = QtWidgets.QLabel("Welcome Back 💜")
+        # ----------- LOGO ROW -----------
+        logo_row = QtWidgets.QHBoxLayout()
+        logo_row.addStretch()
+
+        self.logo_label = QtWidgets.QLabel()
+        self.logo_label.setObjectName("loginLogo")
+
+        # Load logo (make sure this path is correct relative to where you run main.py)
+        pix = QtGui.QPixmap("icons/planit_logo.png")
+        if not pix.isNull():
+            pix = pix.scaled(
+                130, 130,
+                QtCore.Qt.KeepAspectRatio,
+                QtCore.Qt.SmoothTransformation
+            )
+            self.logo_label.setPixmap(pix)
+
+        logo_row.addWidget(self.logo_label)
+        logo_row.addStretch()
+        main.addLayout(logo_row)
+
+        # ----------- TITLE + SUBTITLE -----------
+        # Single main title: "Log in to PlanIt"
+        title = QtWidgets.QLabel("Log in to PlanIt")
         title.setObjectName("loginTitle")
         title.setAlignment(QtCore.Qt.AlignCenter)
 
-        subtitle = QtWidgets.QLabel("Log in to PlanIt")
-        subtitle.setObjectName("loginSubtitle")
-        subtitle.setAlignment(QtCore.Qt.AlignCenter)
+        main.addWidget(title)
 
         # ----------- INPUTS -----------
         self.username_input = QtWidgets.QLineEdit()
@@ -42,6 +62,10 @@ class LoginWindow(QtWidgets.QDialog):
         self.password_input.setObjectName("passwordInput")
         self.password_input.setEchoMode(QtWidgets.QLineEdit.Password)
 
+        main.addSpacing(8)
+        main.addWidget(self.username_input)
+        main.addWidget(self.password_input)
+
         # ----------- BUTTONS -----------
         btn_row = QtWidgets.QHBoxLayout()
 
@@ -51,7 +75,7 @@ class LoginWindow(QtWidgets.QDialog):
         register_btn = QtWidgets.QPushButton(" Register")
         register_btn.setObjectName("loginSecondaryBtn")
 
-        # cute icons
+        # Cute icons
         try:
             purple = "#7D55D9"
             login_btn.setIcon(qta.icon("fa5s.check", color=purple))
@@ -61,13 +85,6 @@ class LoginWindow(QtWidgets.QDialog):
 
         btn_row.addWidget(login_btn)
         btn_row.addWidget(register_btn)
-
-        # ----------- ADD TO LAYOUT -----------
-        main.addWidget(title)
-        main.addWidget(subtitle)
-        main.addSpacing(6)
-        main.addWidget(self.username_input)
-        main.addWidget(self.password_input)
         main.addSpacing(6)
         main.addLayout(btn_row)
 
@@ -76,7 +93,7 @@ class LoginWindow(QtWidgets.QDialog):
         register_btn.clicked.connect(self._on_register)
 
     # ================================
-    # LOGIC (unchanged)
+    # LOGIC
     # ================================
     def _on_register(self):
         username = self.username_input.text().strip()
@@ -84,6 +101,7 @@ class LoginWindow(QtWidgets.QDialog):
         ok, msg, user_id = user_auth.register_user(username, password)
         QtWidgets.QMessageBox.information(self, "Register", msg)
         if ok:
+            # Optionally auto-login after register
             success, _, user_data = user_auth.login_user(username, password)
             if success:
                 self.login_success.emit(user_data)
