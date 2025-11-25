@@ -11,7 +11,7 @@ The app allows users to create tasks, collaborate securely, and track progress u
 - Progress bar with motivational messages  
 
 ### 🔐 Encrypted Tasks
-- All task contents are encrypted using `cryptography`  
+- All task contents are encrypted using PyCryptodome (AES-GCM)  
 - Secure storage for shared or personal tasks  
 
 ### 🤝 Task Sharing
@@ -47,7 +47,7 @@ Just log in using these credentials after launching the program.
 | Component | Technology |
 |----------|------------|
 | GUI | PyQt5 |
-| Encryption | cryptography |
+| Encryption | PyCryptodome |
 | Icons | QtAwesome |
 | Database | SQLite |
 | Backend | Python |

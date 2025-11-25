@@ -1,6 +1,7 @@
 from gui.qt_compat import QtWidgets, QtCore, QtGui
 from core import user_auth
 import qtawesome as qta
+from gui.sound_player import sound_player
 
 
 class LoginWindow(QtWidgets.QDialog):
@@ -95,6 +96,20 @@ class LoginWindow(QtWidgets.QDialog):
     # ================================
     # LOGIC
     # ================================
+    def _complete_login(self, user_data):
+        """Finalize a successful login and close after optional SFX."""
+        self.login_success.emit(user_data)
+        if sound_player.play("welcome.mp3"):
+            QtCore.QTimer.singleShot(800, self.accept)
+        else:
+            self.accept()
+
+    def accept(self):
+        super().accept()
+
+    def reject(self):
+        super().reject()
+
     def _on_register(self):
         username = self.username_input.text().strip()
         password = self.password_input.text()
@@ -104,8 +119,7 @@ class LoginWindow(QtWidgets.QDialog):
             # Optionally auto-login after register
             success, _, user_data = user_auth.login_user(username, password)
             if success:
-                self.login_success.emit(user_data)
-                self.accept()
+                self._complete_login(user_data)
 
     def _on_login(self):
         username = self.username_input.text().strip()
@@ -114,5 +128,5 @@ class LoginWindow(QtWidgets.QDialog):
         if not ok:
             QtWidgets.QMessageBox.warning(self, "Login failed", msg)
             return
-        self.login_success.emit(user_data)
-        self.accept()
+        self._complete_login(user_data)
+

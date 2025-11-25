@@ -1,7 +1,13 @@
 import hashlib
 import hmac
 import secrets
+import sys
+from pathlib import Path
 from typing import Optional, Tuple
+
+if __package__ in (None, ""):
+    # Allow running this module directly by ensuring project root is importable.
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from database.models import User
 

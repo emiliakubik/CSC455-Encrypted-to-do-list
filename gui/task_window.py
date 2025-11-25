@@ -1,9 +1,12 @@
+from pathlib import Path
+
 from gui.qt_compat import QtWidgets, QtCore, QtGui
 from core import task_manager
 from database.models import User
 from gui.share_window import ShareDialog
 import qtawesome as qta
 from datetime import datetime
+from gui.sound_player import sound_player
 
 QPropertyAnimation = QtCore.QPropertyAnimation
 QParallelAnimationGroup = QtCore.QParallelAnimationGroup
@@ -17,12 +20,14 @@ class TaskWindow(QtWidgets.QMainWindow):
         self.user = user_data
         self.setWindowTitle(f"PlanIt — {self.user['username']}")
         self.resize(800, 480)
+        self._closing_with_sound = False
 
         self._tasks = []
         # keep animations alive so they don’t get GC’d
         self._active_anims: list[QtCore.QAbstractAnimation] = []
 
         self.current_filter = "all"  # "all", "done", "pending", "shared"
+        self._all_done_announced = False
 
         # ---------- MAIN LAYOUT ----------
         central = QtWidgets.QWidget()
@@ -168,6 +173,7 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         new_btn = QtWidgets.QPushButton("New")
         edit_btn = QtWidgets.QPushButton("Edit")
+        delete_btn = QtWidgets.QPushButton("Delete")
         share_btn = QtWidgets.QPushButton("Share")
         refresh_btn = QtWidgets.QPushButton("Refresh")
         logout_btn = QtWidgets.QPushButton("Logout")
@@ -177,6 +183,7 @@ class TaskWindow(QtWidgets.QMainWindow):
             purple = "#7D55D9"
             new_btn.setIcon(qta.icon("fa5s.plus", color=purple))
             edit_btn.setIcon(qta.icon("fa5s.edit", color=purple))
+            delete_btn.setIcon(qta.icon("fa5s.trash", color=purple))
             share_btn.setIcon(qta.icon("fa5s.share-alt", color=purple))
             refresh_btn.setIcon(qta.icon("fa5s.sync", color=purple))
             logout_btn.setIcon(qta.icon("fa5s.sign-out-alt", color=purple))
@@ -185,6 +192,7 @@ class TaskWindow(QtWidgets.QMainWindow):
 
         btn_row.addWidget(new_btn)
         btn_row.addWidget(edit_btn)
+        btn_row.addWidget(delete_btn)
         btn_row.addWidget(share_btn)
         btn_row.addWidget(refresh_btn)
         btn_row.addWidget(logout_btn)
@@ -192,7 +200,7 @@ class TaskWindow(QtWidgets.QMainWindow):
         right_layout.addWidget(footer_bar)
 
         # button squish animation (visible bounce + opacity blink)
-        for b in (new_btn, edit_btn, share_btn, refresh_btn, logout_btn):
+        for b in (new_btn, edit_btn, delete_btn, share_btn, refresh_btn, logout_btn):
             eff = QtWidgets.QGraphicsOpacityEffect(b)
             b.setGraphicsEffect(eff)
             # capture both button and effect in the lambda
@@ -205,6 +213,7 @@ class TaskWindow(QtWidgets.QMainWindow):
         self.list_widget.itemChanged.connect(self._on_item_changed)
         new_btn.clicked.connect(self._on_new)
         edit_btn.clicked.connect(self._on_edit)
+        delete_btn.clicked.connect(self._on_delete)
         refresh_btn.clicked.connect(self.refresh)
         share_btn.clicked.connect(self._on_share)
         logout_btn.clicked.connect(self._on_logout)
@@ -305,6 +314,21 @@ class TaskWindow(QtWidgets.QMainWindow):
             group.start()
         except Exception:
             pass
+
+    def _maybe_play_all_done(self, total: int, completed: int):
+        """Play the celebratory audio only when everything is done once per run."""
+        if total <= 0:
+            self._all_done_announced = False
+            return
+
+        if completed == total:
+            if not self._all_done_announced:
+                if not sound_player.play("completedall.mp3"):
+                    if not sound_player.play("Completed.mp3"):
+                        sound_player.play("done.mp3")
+                self._all_done_announced = True
+        else:
+            self._all_done_announced = False
 
     def _play_complete_effect(self, item: QtWidgets.QListWidgetItem):
         """Sparkle + soft bounce next to the checkbox when a task is completed."""
@@ -445,6 +469,8 @@ class TaskWindow(QtWidgets.QMainWindow):
                 vibe = "All done — mission complete 🌙"
             self.vibe_label.setText(vibe)
 
+        self._maybe_play_all_done(total, completed)
+
         # keep date fresh (in case app stays open over midnight)
         self._update_date_label()
 
@@ -536,6 +562,7 @@ class TaskWindow(QtWidgets.QMainWindow):
             self._on_select()
 
         if checked:
+            sound_player.play("onetask.mp3")
             self._play_complete_effect(item)
 
         # --- UPDATE PROGRESS BAR + VIBE IMMEDIATELY ---
@@ -560,10 +587,13 @@ class TaskWindow(QtWidgets.QMainWindow):
 
             self.vibe_label.setText(vibe)
 
+        self._maybe_play_all_done(total, completed)
+
     def _on_new(self):
         dialog = NewTaskDialog(self.user["user_id"], self)
         if dialog.exec_():
             self.refresh()
+            sound_player.play("createtask.mp3")
 
     def _on_share(self):
         row = self.list_widget.currentRow()
@@ -601,9 +631,46 @@ class TaskWindow(QtWidgets.QMainWindow):
             # reload tasks so list + details show updated text
             self.refresh()
 
+    def _on_delete(self):
+        row = self.list_widget.currentRow()
+        if row < 0:
+            QtWidgets.QMessageBox.warning(self, "Delete Task", "Select a task first")
+            return
+
+        item = self.list_widget.currentItem()
+        task_id = item.data(QtCore.Qt.UserRole)
+
+        confirm = QtWidgets.QMessageBox.question(
+            self,
+            "Delete Task",
+            f"Delete '{item.text()}'?",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+        )
+        if confirm != QtWidgets.QMessageBox.Yes:
+            return
+
+        ok, msg = task_manager.delete_task(task_id, self.user["user_id"])
+        QtWidgets.QMessageBox.information(self, "Delete Task", msg)
+        if ok:
+            sound_player.play("deletetask.mp3")
+            self.refresh()
+
     def _on_logout(self):
         self.logout_requested.emit()
         self.close()
+
+    def closeEvent(self, event):
+        if self._closing_with_sound:
+            return super().closeEvent(event)
+
+        played = sound_player.play("goodbye.mp3")
+        if played:
+            event.ignore()
+            self._closing_with_sound = True
+            QtCore.QTimer.singleShot(600, self.close)
+            return
+
+        super().closeEvent(event)
 
 
 class NewTaskDialog(QtWidgets.QDialog):

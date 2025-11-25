@@ -1,5 +1,3 @@
-import base64
-
 import pytest
 
 from crypto import encryption, key_manager
@@ -30,8 +28,8 @@ def test_each_user_gets_unique_key_material():
     user_key_2 = key_manager.derive_user_key(2)
     
     assert user_key_1 != user_key_2
-    # Fernet keys are base64 encoded 32-byte values.
-    assert len(base64.urlsafe_b64decode(user_key_1)) == 32
+    # AES-256 keys are 32 raw bytes.
+    assert len(user_key_1) == 32
 
 
 def test_encrypted_data_key_round_trip():

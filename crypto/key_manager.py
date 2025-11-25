@@ -1,12 +1,10 @@
 """
 Key derivation utilities to make it easy to encrypt todo data for multiple users.
 
-Each todo has its own random data key (handled in crypto/encryption.py). In order
-to give multiple users access we need to store that data key encrypted for every
-collaborator. Rather than asking users to manage their own secrets, we derive a
-stable per-user key from a master secret using HMAC-SHA256. The master secret is
-stored on disk (crypto/master.key by default) and can be overridden through the
-TODO_MASTER_KEY_PATH environment variable for tests/other environments.
+Each todo has its own random data key, in order
+to give multiple users access, we need to store that data key encrypted for every
+collaborator. Rather than asking users to manage their own keys, we derive a
+stable per-user key from a master secret using HMAC-SHA256.
 """
 
 from __future__ import annotations
@@ -18,10 +16,14 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from cryptography.fernet import Fernet, InvalidToken
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 MASTER_KEY_ENV_VAR = "TODO_MASTER_KEY_PATH"
 DEFAULT_MASTER_KEY_PATH = Path("crypto/master.key")
+
+NONCE_BYTES = 12
+TAG_BYTES = 16
 
 _master_key_cache: Optional[bytes] = None
 
@@ -54,7 +56,7 @@ def _load_or_create_master_key() -> bytes:
         try:
             _master_key_cache = base64.urlsafe_b64decode(raw)
             return _master_key_cache
-        except Exception as exc:  # pragma: no cover - defensive branch
+        except Exception as exc:  
             raise ValueError(f"Failed to load master key from {path}") from exc
     
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,7 +66,7 @@ def _load_or_create_master_key() -> bytes:
     try:
         os.chmod(path, 0o600)
     except OSError:
-        # On some OS (e.g. Windows) chmod may fail; not critical for functionality.
+        #on some OS (e.g. Windows) chmod may fail; not critical for functionality.
         pass
     
     _master_key_cache = master_key
@@ -73,8 +75,7 @@ def _load_or_create_master_key() -> bytes:
 
 def derive_user_key(user_id: int) -> bytes:
     """
-    Derive a stable user-specific key using HMAC(master_key, user_id).
-    The output is encoded so it can be fed directly into Fernet.
+    Derive a stable user specific key
     """
     if user_id is None:
         raise ValueError("user_id is required to derive a user key")
@@ -82,7 +83,7 @@ def derive_user_key(user_id: int) -> bytes:
     master_key = _load_or_create_master_key()
     message = str(int(user_id)).encode("utf-8")
     digest = hmac.new(master_key, message, hashlib.sha256).digest()
-    return base64.urlsafe_b64encode(digest)
+    return digest
 
 
 def encrypt_data_key_for_user(user_id: int, data_key: bytes) -> str:
@@ -96,14 +97,30 @@ def encrypt_data_key_for_user(user_id: int, data_key: bytes) -> str:
         payload = data_key
     
     user_key = derive_user_key(user_id)
-    encrypted = Fernet(user_key).encrypt(payload)
-    return encrypted.decode("utf-8")
+    nonce = get_random_bytes(NONCE_BYTES)
+    cipher = AES.new(user_key, AES.MODE_GCM, nonce=nonce)
+    ciphertext, tag = cipher.encrypt_and_digest(payload)
+    token = base64.urlsafe_b64encode(nonce + tag + ciphertext)
+    return token.decode("utf-8")
 
 
 def decrypt_data_key_for_user(user_id: int, encrypted_key: str) -> bytes:
     """Decrypt the todo data key for a user, returning the raw key bytes."""
     user_key = derive_user_key(user_id)
     try:
-        return Fernet(user_key).decrypt(encrypted_key.encode("utf-8"))
-    except InvalidToken as exc:
+        raw = base64.urlsafe_b64decode(encrypted_key.encode("utf-8"))
+    except Exception as exc:
+        raise ValueError("Encrypted key is not valid base64") from exc
+    
+    if len(raw) < NONCE_BYTES + TAG_BYTES:
+        raise ValueError("Encrypted key payload is too short")
+    
+    nonce = raw[:NONCE_BYTES]
+    tag = raw[NONCE_BYTES:NONCE_BYTES + TAG_BYTES]
+    ciphertext = raw[NONCE_BYTES + TAG_BYTES :]
+    
+    cipher = AES.new(user_key, AES.MODE_GCM, nonce=nonce)
+    try:
+        return cipher.decrypt_and_verify(ciphertext, tag)
+    except ValueError as exc:
         raise ValueError("Encrypted key cannot be decrypted for this user") from exc
