@@ -1,4 +1,6 @@
-from gui.qt_compat import QtWidgets, QtCore, QtGui
+from pathlib import Path
+
+from gui.qt_compat import QtWidgets, QtCore, QtGui, QtMultimedia
 from core import task_manager
 from database.models import User
 from gui.share_window import ShareDialog

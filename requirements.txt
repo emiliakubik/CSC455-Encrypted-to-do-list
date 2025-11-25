@@ -2,3 +2,4 @@ PyQt5>=5.15.0
 pycryptodome>=3.20
 pytest
 qtawesome
+pygame>=2.0.0
