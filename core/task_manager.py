@@ -208,6 +208,28 @@ def read_task(task_id: int, user_id: int) -> Optional[dict]:
     }
 
 
+def delete_task(task_id: int, user_id: int) -> Tuple[bool, str]:
+    """Delete a todo (only the creator can delete)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT created_by FROM todos WHERE task_id = ?", (task_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False, "Task not found"
+        created_by = row[0]
+        if created_by != user_id:
+            return False, "Only the creator can delete this task"
+
+        cursor.execute("DELETE FROM encryption_keys WHERE task_id = ?", (task_id,))
+        cursor.execute("DELETE FROM permissions WHERE task_id = ?", (task_id,))
+        cursor.execute("DELETE FROM todos WHERE task_id = ?", (task_id,))
+        conn.commit()
+        return True, "Task deleted"
+    finally:
+        conn.close()
+
+
 def _normalize_shared_users(shared_with: Optional[Iterable[int]]) -> Sequence[int]:
     if not shared_with:
         return []

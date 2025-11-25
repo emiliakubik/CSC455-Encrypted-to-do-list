@@ -1,8 +1,7 @@
-from pathlib import Path
-
-from gui.qt_compat import QtWidgets, QtCore, QtGui, QtMultimedia
+from gui.qt_compat import QtWidgets, QtCore, QtGui
 from core import user_auth
 import qtawesome as qta
+from gui.sound_player import sound_player
 
 
 class LoginWindow(QtWidgets.QDialog):
@@ -10,8 +9,6 @@ class LoginWindow(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._welcome_sound = self._load_sound("welcome.mp3")
-        self._goodbye_sound = self._load_sound("goodbye.mp3")
 
         # Object name so the stylesheet can target this dialog
         self.setObjectName("loginDialog")
@@ -95,55 +92,23 @@ class LoginWindow(QtWidgets.QDialog):
         # ----------- SIGNALS -----------
         login_btn.clicked.connect(self._on_login)
         register_btn.clicked.connect(self._on_register)
+
     # ================================
     # LOGIC
     # ================================
-    #this is the welcome sound effect
-    def _load_sound(self, filename):
-        """Prepare a reusable sound effect using Qt's multimedia stack."""
-        sound_path = Path(__file__).resolve().parent.parent / "sounds" / filename
-        if not sound_path.exists():
-            return None
-        url = QtCore.QUrl.fromLocalFile(str(sound_path))
-        player = QtMultimedia.QMediaPlayer(self)
-        if hasattr(QtMultimedia, "QAudioOutput"):
-            audio = QtMultimedia.QAudioOutput(self)
-            audio.setVolume(1.0)
-            player.setAudioOutput(audio)
-            player._audio_output = audio 
-            player.setSource(url)
-        else:
-            player.setMedia(QtMultimedia.QMediaContent(url))
-            player.setVolume(100)
-        return player
-
-    def _play_welcome_sound(self):
-        if self._welcome_sound is not None:
-            self._welcome_sound.stop()
-            self._welcome_sound.play()
-            return True
-        return False
-
-    def _play_goodbye_sound(self):
-        if self._goodbye_sound is not None:
-            self._goodbye_sound.stop()
-            self._goodbye_sound.play()
-            return True
-        return False
-
     def _complete_login(self, user_data):
         """Finalize a successful login and close after optional SFX."""
         self.login_success.emit(user_data)
-        if self._play_welcome_sound():
+        if sound_player.play("welcome.mp3"):
             QtCore.QTimer.singleShot(800, self.accept)
         else:
             self.accept()
 
     def accept(self):
-        if self._play_goodbye_sound():
-            QtCore.QTimer.singleShot(600, super().accept)
-        else:
-            super().accept()
+        super().accept()
+
+    def reject(self):
+        super().reject()
 
     def _on_register(self):
         username = self.username_input.text().strip()

@@ -1,6 +1,7 @@
 from gui.qt_compat import QtWidgets
 from database.models import User
 from core import task_manager
+from gui.sound_player import sound_player
 
 
 class ShareDialog(QtWidgets.QDialog):
@@ -40,4 +41,5 @@ class ShareDialog(QtWidgets.QDialog):
         ok, msg = task_manager.share_task_with_user(self.task_id, self.owner_id, user['user_id'])
         QtWidgets.QMessageBox.information(self, "Share", msg)
         if ok:
+            sound_player.play("sharetask.mp3")
             self.accept()
