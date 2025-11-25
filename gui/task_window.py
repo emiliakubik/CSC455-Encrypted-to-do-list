@@ -71,6 +71,8 @@ class TaskWindow(QtWidgets.QMainWindow):
         self.list_widget = QtWidgets.QListWidget()
         self.list_widget.setObjectName("todoList")
         left_layout.addWidget(self.list_widget, 1)
+        self.list_widget.setMinimumWidth(320)
+        self.list_widget.setUniformItemSizes(True)
 
         # add left column to main layout (narrower)
         main_layout.addLayout(left_layout, 1)
@@ -100,7 +102,7 @@ class TaskWindow(QtWidgets.QMainWindow):
         pix = QtGui.QPixmap("icons/planit_logo.png")  # adjust path if needed
         if not pix.isNull():
             pix = pix.scaled(
-                150, 150,                    # big logo like you had
+                120, 120,                    # big logo like you had
                 QtCore.Qt.KeepAspectRatio,
                 QtCore.Qt.SmoothTransformation,
             )
@@ -146,7 +148,6 @@ class TaskWindow(QtWidgets.QMainWindow):
         # ---------- TODAY'S PROGRESS BAR + VIBE TEXT ----------
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedHeight(10)
         self.progress_bar.setRange(0, 100)
         right_layout.addWidget(self.progress_bar)
 
