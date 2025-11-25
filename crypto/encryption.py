@@ -1,8 +1,8 @@
 """
-Utility helpers around encrypting/decrypting todo data with per-task keys.
+Utility helpers around encrypting/decrypting todo data with 'per task' keys.
 
 The module currently uses Fernet (AES128-CBC + HMAC) from the cryptography
-package because it provides authenticated encryption with minimal boilerplate.
+package. This was chosen as it provides authenticated encryption with minimal boilerplate.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ def generate_data_key() -> bytes:
 def encrypt_message(plaintext: Optional[str], data_key: bytes) -> str:
     """
     Encrypt a plaintext message with the provided data key.
-    
     Returns a UTF-8 string ready to be stored in the database.
     """
     if plaintext is None:

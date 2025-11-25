@@ -13,8 +13,8 @@ HASH_PREFIX = "pbkdf2_sha256"
 
 def hash_password(password: str) -> str:
     """
-    Hash a password using PBKDF2-HMAC-SHA256 with a random salt.
-    Returns a self-contained string that stores the parameters needed for verification.
+    Hash a password using with random salt,
+    returns a self contained string that stores the parameters needed for verification.
     """
     if not isinstance(password, str):
         raise TypeError("Password must be a string")
@@ -35,12 +35,8 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, stored_value: str) -> Tuple[bool, Optional[str]]:
     """
-    Verify a password against the stored hash.
+    Verify password against the stored hash.
     
-    Returns:
-        (is_valid, upgraded_hash)
-        upgraded_hash will be populated when the stored value was plaintext and
-        needs to be upgraded to the secure hash format.
     """
     if not isinstance(password, str):
         return False, None
